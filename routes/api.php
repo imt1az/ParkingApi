@@ -4,6 +4,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\GeocodeController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SpaceAvailabilityController;
 use App\Http\Controllers\SpaceController;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::get('/health', fn() => response()->json(['ok' => true]));
+    Route::post('/geocode', [GeocodeController::class, 'store']);
 
     // Public auth
     Route::post('/auth/register', [AuthController::class, 'register']);
