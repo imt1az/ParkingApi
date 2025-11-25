@@ -1,59 +1,59 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Parking API (Laravel 12)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+JWT-সুরক্ষিত পার্কিং বুকিং REST API. ফিচার: ইউজার রোল (driver/provider/admin), স্পেস ম্যানেজমেন্ট, অ্যাভেইলেবিলিটি উইন্ডো, লোকেশন-ভিত্তিক সার্চ, বুকিং লাইফসাইকেল (reserve → confirm → check-in → complete/cancel).
 
-## About Laravel
+## টেক স্ট্যাক
+- PHP 8.2+, Laravel 12
+- MySQL 8 (spatial ফাংশনসহ) – `POINT`, `SPATIAL INDEX`, `ST_Distance_Sphere` লাগে
+- JWT: `tymon/jwt-auth`
+- Vite/Tailwind (ফ্রন্টএন্ড scaffold)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## সেটআপ
+1) ডিপেন্ডেন্সি ইন্সটল  
+```
+composer install
+npm install
+```
+2) `.env` তৈরি করুন (`.env.example` থেকে) ও কনফিগ করুন:
+   - `APP_KEY` → `php artisan key:generate`
+   - `JWT_SECRET` → `php artisan jwt:secret`
+   - `DB_*` MySQL ক্রেডেনশিয়াল (MySQL 8 spatial সক্ষম)
+3) মাইগ্রেশন ও সিড চালান  
+```
+php artisan migrate --seed
+```
+4) লোকাল রান  
+```
+php artisan serve
+```
+ফ্রন্টএন্ড ডেভ: `npm run dev`, বিল্ড: `npm run build`.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## ডেমো ইউজার (পাসওয়ার্ড `password`)
+- ড্রাইভার: `01700000001`
+- প্রোভাইডার: `01700000002`
+- অ্যাডমিন: `01700000003`
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## মূল API রুট (prefix `/api/v1`)
+- Auth: `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`
+- Spaces (provider/admin): `POST /spaces`, `GET /spaces/my`, `PATCH /spaces/{id}`  
+  Public: `GET /spaces/{id}`
+- Availability (provider/admin): `POST /spaces/{space}/availability`
+- বুকিং:
+  - Driver: `POST /bookings`, `GET /bookings/my`
+  - Provider/Admin: `GET /bookings/for-my-spaces`
+  - Status updates: `PATCH /bookings/{id}/confirm`, `/cancel`, `/check-in`, `/check-out`
+- সার্চ (public): `GET /search?lat&lng&start_ts&end_ts&radius_m`
 
-## Learning Laravel
+## বুকিং ফ্লো সারাংশ
+1) ড্রাইভার সার্চ → `POST /bookings` দিয়ে বুক করে (ওভারল্যাপ/অ্যাভেইলেবিলিটি চেক হয়)।  
+2) প্রোভাইডার/অ্যাডমিন `PATCH /bookings/{id}/confirm` করে।  
+3) চেক-ইন/চেক-আউট `PATCH /check-in` → `PATCH /check-out`.  
+4) ক্যানসেল (driver/provider) `PATCH /cancel` (reserved/confirmed অবস্থায়)।  
+5) My bookings: ড্রাইভার `/bookings/my`, প্রোভাইডার `/bookings/for-my-spaces`.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## ডাটাবেস নোট
+- `parking_spaces` টেবিলে `location` POINT ও spatial index; insert/update ট্রিগার lat/lng থেকে location সেট করে।  
+- সার্চ কুয়েরি MySQL `ST_Distance_Sphere` ব্যবহার করে রেডিয়াস ফিল্টার করে।
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## টেস্ট
+- ডিফল্ট উদাহরণ টেস্ট ছাড়া কিছু নেই; নতুন ফিচার যোগ করলে ফিচার টেস্ট লেখার পরামর্শ।

@@ -5,12 +5,86 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\ParkingSpace;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class BookingController extends Controller
 {
-    // ... (তোমার আগের store(), myBookings() থাকবে)
+    // Driver: create booking
+    public function store(Request $r)
+    {
+        $u = $this->mustDriver();
+
+        $r->validate([
+            'space_id' => 'required|exists:parking_spaces,id',
+            'start_ts' => 'required|date',
+            'end_ts'   => 'required|date|after:start_ts',
+        ]);
+
+        $space = ParkingSpace::findOrFail($r->space_id);
+        abort_unless($space->is_active, 409, 'Space not active');
+
+        // Availability must cover the full requested window
+        $availability = $space->availability()
+            ->where('is_active', true)
+            ->where('start_ts', '<=', $r->start_ts)
+            ->where('end_ts',   '>=', $r->end_ts)
+            ->orderBy('start_ts')
+            ->first();
+
+        if (! $availability) {
+            return response()->json([
+                'error' => ['code' => 'NO_AVAILABILITY', 'message' => 'No active availability for requested window']
+            ], 409);
+        }
+
+        // Prevent overlap with existing active bookings
+        $overlap = Booking::where('space_id', $space->id)
+            ->whereIn('status', ['reserved','confirmed','checked_in'])
+            ->where(function ($q) use ($r) {
+                $q->where('start_ts', '<', $r->end_ts)
+                  ->where('end_ts',   '>', $r->start_ts);
+            })
+            ->exists();
+
+        if ($overlap) {
+            return response()->json([
+                'error' => ['code' => 'ALREADY_BOOKED', 'message' => 'Time window overlaps another booking']
+            ], 409);
+        }
+
+        $start = Carbon::parse($r->start_ts);
+        $end   = Carbon::parse($r->end_ts);
+        $minutes = $end->diffInMinutes($start);
+        $hours   = round($minutes / 60, 2);
+        $price   = round($hours * $availability->base_price_per_hour, 2);
+
+        $booking = Booking::create([
+            'user_id' => $u->id,
+            'space_id' => $space->id,
+            'start_ts' => $start,
+            'end_ts'   => $end,
+            'hours'    => $hours,
+            'price_total' => $price,
+            'status'   => 'reserved',
+        ]);
+
+        return response()->json($booking->load('space:id,title,address,provider_id'), 201);
+    }
+
+    // Driver: list own bookings
+    public function myBookings(Request $r)
+    {
+        $u = $this->mustDriver();
+
+        $q = Booking::with(['space:id,title,address,provider_id'])
+            ->where('user_id', $u->id);
+
+        if ($r->filled('status')) {
+            $q->where('status', $r->status);
+        }
+
+        return response()->json($q->orderByDesc('id')->paginate(20));
+    }
 
     private function mustProviderOrAdmin()
     {
@@ -38,7 +112,7 @@ class BookingController extends Controller
         abort_unless($u->role === 'provider' && $booking->space->provider_id === $u->id, 403, 'FORBIDDEN');
     }
 
-    // Provider/Admin: নিজের স্পেসগুলোর বুকিং লিস্ট
+    // Provider/Admin: list bookings for owned spaces
     public function forMySpaces(Request $r)
     {
         $u = $this->mustProviderOrAdmin();
@@ -126,3 +200,4 @@ class BookingController extends Controller
         return response()->json(['ok'=>true, 'status'=>$booking->status]);
     }
 }
+
