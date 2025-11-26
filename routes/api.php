@@ -4,6 +4,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\LocationController;
 use App\Http\Controllers\GeocodeController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SpaceAvailabilityController;
@@ -22,6 +23,7 @@ Route::prefix('v1')->group(function () {
     // Protected
     Route::middleware('auth:api')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::post('/me/location', [LocationController::class, 'store']);
 
         // Provider/Admin only
         Route::post('/spaces', [SpaceController::class, 'store']);           // create

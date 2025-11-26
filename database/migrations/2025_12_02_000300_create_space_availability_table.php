@@ -16,6 +16,8 @@ return new class extends Migration
             $t->decimal('base_price_per_hour', 10, 2);
             $t->boolean('is_active')->default(true);
             $t->timestamps();
+            $t->charset = 'utf8mb4';
+            $t->collation = 'utf8mb4_unicode_ci';
         });
     }
 
