@@ -10,7 +10,7 @@ class ParkingSpace extends Model
     use HasFactory;
 
     protected $fillable = [
-        'provider_id', 'title', 'description', 'address',
+        'provider_id', 'title', 'description', 'address', 'place_label',
         'lat', 'lng', 'capacity', 'height_limit', 'is_active'
     ];
 
