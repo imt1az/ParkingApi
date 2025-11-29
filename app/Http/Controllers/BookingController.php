@@ -199,5 +199,30 @@ class BookingController extends Controller
 
         return response()->json(['ok'=>true, 'status'=>$booking->status]);
     }
-}
 
+    // Provider/Admin: monthly income for owned spaces (last 12 months)
+    public function monthlyReport(Request $r)
+    {
+        $u = $this->mustProviderOrAdmin();
+
+        $rows = Booking::query()
+            ->selectRaw("DATE_FORMAT(start_ts, '%Y-%m') as month, SUM(price_total) as total, COUNT(*) as count")
+            ->where('status', 'completed')
+            ->whereHas('space', function ($q) use ($u) {
+                if ($u->role === 'provider') {
+                    $q->where('provider_id', $u->id);
+                }
+            })
+            ->groupBy('month')
+            ->orderBy('month', 'desc')
+            ->limit(12)
+            ->get();
+
+        $sum = $rows->sum('total');
+
+        return response()->json([
+            'total_income' => $sum,
+            'months' => $rows,
+        ]);
+    }
+}

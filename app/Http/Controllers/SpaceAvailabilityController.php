@@ -16,6 +16,25 @@ class SpaceAvailabilityController extends Controller
         return $u;
     }
 
+    // Public: list active availability windows for a space
+    public function index($spaceId)
+    {
+        $space = ParkingSpace::findOrFail($spaceId);
+
+        $rows = SpaceAvailability::where('space_id', $space->id)
+            ->where('is_active', true)
+            ->where('end_ts', '>', now())
+            ->orderBy('start_ts')
+            ->get([
+                'id', 'space_id', 'start_ts', 'end_ts', 'base_price_per_hour', 'is_active'
+            ]);
+
+        return response()->json([
+            'count' => $rows->count(),
+            'items' => $rows,
+        ]);
+    }
+
     public function store($spaceId, Request $r)
     {
 

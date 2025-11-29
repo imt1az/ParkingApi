@@ -68,4 +68,58 @@ class SearchController extends Controller
             ]
         ]);
     }
+
+    // Auth: search using the driver's last saved location
+    public function nearby(Request $r)
+    {
+        $user = auth('api')->user();
+        abort_unless($user, 401, 'Unauthenticated');
+
+        $r->validate([
+            'start_ts' => 'required|date',
+            'end_ts'   => 'required|date|after:start_ts',
+            'radius_m' => 'sometimes|integer|min:100|max:5000'
+        ]);
+
+        abort_unless($user->last_lat !== null && $user->last_lng !== null, 409, 'No saved location for user');
+
+        $lat = (float) $user->last_lat;
+        $lng = (float) $user->last_lng;
+        $radius = (int) ($r->radius_m ?? 1500);
+        $bboxDelta = max($radius / 110000, 0.02);
+
+        $spaces = DB::table('parking_spaces as ps')
+            ->selectRaw("
+                ps.id, ps.title, ps.address, ps.place_label, ps.lat, ps.lng, ps.capacity, ps.height_limit,
+                ST_Distance_Sphere(
+                    ST_PointFromText(CONCAT('POINT(', ps.lng, ' ', ps.lat, ')')),
+                    ST_PointFromText(CONCAT('POINT(', ?, ' ', ?, ')'))
+                ) AS distance_m
+            ", [$lng, $lat])
+            ->where('ps.is_active', 1)
+            ->whereBetween('ps.lat', [$lat - $bboxDelta, $lat + $bboxDelta])
+            ->whereBetween('ps.lng', [$lng - $bboxDelta, $lng + $bboxDelta])
+            ->whereExists(function ($q) use ($r) {
+                $q->from('space_availability as av')
+                  ->whereColumn('av.space_id', 'ps.id')
+                  ->where('av.is_active', 1)
+                  ->where('av.start_ts', '<', $r->end_ts)
+                  ->where('av.end_ts',   '>', $r->start_ts);
+            })
+            ->having('distance_m', '<=', $radius)
+            ->orderBy('distance_m')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'count' => $spaces->count(),
+            'items' => $spaces,
+            'requested' => [
+                'lat' => $lat, 'lng' => $lng,
+                'start_ts' => $r->start_ts, 'end_ts' => $r->end_ts,
+                'radius_m' => $radius,
+                'resolved_address' => null,
+            ]
+        ]);
+    }
 }
